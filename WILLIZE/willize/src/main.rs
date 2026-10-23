@@ -4,6 +4,7 @@ mod harmony;
 mod input;
 mod melody;
 mod midi;
+mod sampler;
 mod train;
 
 use arrange::{Arranger, Mood, Opts, Score, PALETTE};
@@ -117,55 +118,58 @@ fn to_song(sc: &Score, render: Option<usize>) -> Song {
     Song { ppq: PPQ as u16, tracks }
 }
 
-/// Rendu GM : chaque pupitre rendu séparément (canal et expression propres), puis mixage.
+fn sons_dir() -> std::path::PathBuf {
+    std::path::PathBuf::from(format!("{}/../sons", env!("CARGO_MANIFEST_DIR")))
+}
+
+/// Rendu audio : échantillons orchestraux VSCO-2 CE (échantillonneur maison),
+/// complétés par GeneralUser GS (FluidSynth) pour les pupitres absents de VSCO.
 fn render(sc: &Score, mp3: &str) {
     let dir = std::env::temp_dir().join(format!("willize_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let sf = "/usr/share/sounds/sf2/FluidR3_GM.sf2";
-    let gain = |name: &str| -> f32 {
-        match name {
-            "Horns" => 1.3,
-            "Trumpets" | "Trombones" => 0.9,
-            "Violins 1" | "Violins 2" => 1.1,
-            "Harp" => 1.1,
-            "Glockenspiel" | "Celesta" | "Xylophone" => 0.6,
-            "Piatti" => 0.7,
-            _ => 1.0,
-        }
-    };
-    let mut wavs = vec![];
+    let vsco = sons_dir().join("vsco");
+    let gu = sons_dir().join("GeneralUser.sf2");
+    let sf = if gu.exists() { gu.to_string_lossy().to_string() } else { "/usr/share/sounds/sf2/FluidR3_GM.sf2".to_string() };
+    let orch = if vsco.exists() { sampler::load_orchestra(&vsco) } else { Default::default() };
+    let mut inputs: Vec<(std::path::PathBuf, f32)> = vec![];
+    if !orch.is_empty() {
+        let (l, r) = sampler::render(sc, &orch);
+        let w = dir.join("orchestre.wav");
+        sampler::write_wav(&w, &l, &r);
+        inputs.push((w, 1.0));
+    }
     for (i, dk) in PALETTE.iter().enumerate() {
-        if sc.parts[i].is_empty() {
+        if sc.parts[i].is_empty() || orch.contains_key(dk.name) {
             continue;
         }
         let mid = dir.join(format!("{}.mid", i));
         let wav = dir.join(format!("{}.wav", i));
         std::fs::write(&mid, midi::write(&to_song(sc, Some(i)))).unwrap();
         let ok = Command::new("fluidsynth")
-            .args(["-ni", "-g", "0.5", "-R", "1", "-r", "44100", "-F"])
+            .args(["-ni", "-g", "0.5", "-R", "1", "-o", "synth.reverb.room-size=0.8", "-o", "synth.reverb.level=0.7", "-r", "44100", "-F"])
             .arg(&wav)
-            .arg(sf)
+            .arg(&sf)
             .arg(&mid)
             .output()
             .is_ok_and(|o| o.status.success());
         if ok {
-            wavs.push((wav, gain(dk.name)));
+            inputs.push((wav, if orch.is_empty() { 1.0 } else { 0.35 }));
         }
     }
     let mut cmd = Command::new("ffmpeg");
     cmd.args(["-y", "-loglevel", "error"]);
-    for (w, _) in &wavs {
+    for (w, _) in &inputs {
         cmd.arg("-i").arg(w);
     }
     let mut f = String::new();
-    for (j, (_, g)) in wavs.iter().enumerate() {
+    for (j, (_, g)) in inputs.iter().enumerate() {
         f += &format!("[{}]volume={}[a{}];", j, g, j);
     }
-    for j in 0..wavs.len() {
+    for j in 0..inputs.len() {
         f += &format!("[a{}]", j);
     }
-    f += &format!("amix=inputs={}:normalize=0,silenceremove=stop_periods=1:stop_duration=1.5:stop_threshold=-60dB,loudnorm=I=-16:TP=-1", wavs.len());
-    cmd.args(["-filter_complex", &f, "-b:a", "192k", mp3]);
+    f += &format!("amix=inputs={}:normalize=0,silenceremove=stop_periods=1:stop_duration=1.5:stop_threshold=-60dB,loudnorm=I=-16:TP=-1", inputs.len());
+    cmd.args(["-filter_complex", &f, "-b:a", "256k", mp3]);
     let st = cmd.status().expect("ffmpeg absent");
     assert!(st.success(), "mixage ffmpeg échoué");
     let _ = std::fs::remove_dir_all(&dir);
@@ -217,6 +221,9 @@ fn main() {
                 render(&sc, &mp3);
                 println!("→ {}", mp3);
             }
+        }
+        Some("samples") => {
+            print!("{}", sampler::describe(&sampler::load_orchestra(&sons_dir().join("vsco"))));
         }
         Some("survey") => {
             let c = corpus::load_all(&corpus_dir);

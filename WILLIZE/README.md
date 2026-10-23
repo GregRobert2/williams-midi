@@ -31,3 +31,17 @@ Ton MIDI peut contenir plusieurs pistes ; chacune est classée automatiquement :
 - **Harpe, claviers et lames** : Harpe, Glockenspiel, Célesta, Xylophone, Marimba.
 
 Sortie : MIDI multipiste (dynamique en CC1, signatures, tempo) et, en option, un rendu MP3 GM de contrôle.
+
+## Sons (rendu audio)
+Le MP3 de contrôle est rendu par l'échantillonneur intégré avec les échantillons **VSCO-2 CE** (CC0) :
+- **Tenues et articulations courtes** pour cordes, cuivres et bois.
+- **Couches de vélocité** et alternance des échantillons.
+- **Pupitres placés en stéréo**, réverbération de salle.
+
+Le célesta est complété par **GeneralUser GS**. Ces sons ne sont pas versionnés (près de 1 Go) ; pour les installer dans `WILLIZE/sons/` :
+```
+git clone --depth 1 --filter=blob:none --sparse https://github.com/sgossner/VSCO-2-CE sons/vsco
+(cd sons/vsco && git sparse-checkout set --no-cone "/Brass/" "/Strings/" "/Woodwinds/" "/Percussion/" "/VSCO 1 Percussion/drums/bass/" "/VSCO 1 Percussion/varMetal/Cymbals/")
+curl -sL https://registry.npmjs.org/generaluser/-/generaluser-1.47.1.tgz | tar xz && mv package/GeneralUser.sf2 sons/
+```
+`willize samples` affiche les échantillons chargés (hauteurs vérifiées par analyse).
