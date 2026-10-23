@@ -57,23 +57,66 @@ pub struct Harmonizer<'a> {
     emis: [[[f32; 12]; NQ]; 2],
     /// échelle du rythme harmonique (1 = Williams moyen, < 1 = plus lent)
     pub hr: f32,
+    /// réharmonisation : accords d'un exposé précédent (temps relatif) à ne pas reprendre
+    pub avoid: Vec<Chord>,
+    /// bonus de couleur (tétrades, sus) pour une réexposition plus riche
+    pub color: f32,
+    /// préférence pour les accords majeurs (écriture héroïque)
+    pub major_bias: f32,
 }
 
 impl<'a> Harmonizer<'a> {
     pub fn new(m: &'a Model, key: Key) -> Self {
+        Self::with_stats(m, key, false)
+    }
+
+    /// `forte` : statistiques des seuls passages forte (majestueux / tutti).
+    /// Les statistiques sont ramenées aux triades (les 7e détectées dans des
+    /// MIDI amateurs sont surtout des doublures / notes de passage), puis la
+    /// couleur (7e, sus) est un réglage explicite.
+    pub fn with_stats(m: &'a Model, key: Key, forte: bool) -> Self {
+        let red = |q: u8| -> u8 {
+            match q {
+                3 | 4 | 7 | 8 => 0,
+                5 => 1,
+                x => x,
+            }
+        };
+        let (cf, tr) = if forte { (&m.chord_freq_f, &m.trans_f) } else { (&m.chord_freq, &m.trans) };
+        let mut cfr: std::collections::HashMap<(u8, u8), f32> = Default::default();
+        for ((mj, r, q), c) in cf {
+            if *mj == key.maj {
+                *cfr.entry((*r, red(*q))).or_default() += c;
+            }
+        }
+        let mut trr: std::collections::HashMap<(u8, u8), std::collections::HashMap<(u8, u8), f32>> = Default::default();
+        for ((mj, r, q), row) in tr {
+            if *mj != key.maj {
+                continue;
+            }
+            for ((r2, q2), c) in row {
+                let a = (*r, red(*q));
+                let b = (*r2, red(*q2));
+                if a != b {
+                    *trr.entry(a).or_default().entry(b).or_default() += c;
+                }
+            }
+        }
+        let tot: f32 = cfr.values().sum::<f32>().max(1.);
         let mut prior = vec![0f32; NS];
-        let tot: f32 = m.chord_freq.iter().filter(|x| x.0 .0 == key.maj).map(|x| x.1).sum();
         for s in 0..NS {
             let (r, q) = st(s);
             let rel = (r + 12 - key.tonic) % 12;
-            let c = m.chord_freq.get(&(key.maj, rel, q)).copied().unwrap_or(0.);
-            prior[s] = ((c + 0.02 * tot / NS as f32) / tot).ln();
+            let c = cfr.get(&(rel, red(q))).copied().unwrap_or(0.);
+            // les états non-triades partagent la masse de leur triade
+            let share = if red(q) == q { 1. } else { 0.25 };
+            prior[s] = ((c * share + 0.02 * tot / NS as f32) / tot).ln();
         }
         let mut trans = vec![vec![0f32; NS]; NS];
         for a in 0..NS {
             let (r, q) = st(a);
             let rel = (r + 12 - key.tonic) % 12;
-            let row = m.trans.get(&(key.maj, rel, q));
+            let row = trr.get(&(rel, red(q)));
             let rt: f32 = row.map(|x| x.values().sum()).unwrap_or(0.);
             for b in 0..NS {
                 if a == b {
@@ -82,7 +125,12 @@ impl<'a> Harmonizer<'a> {
                 }
                 let (r2, q2) = st(b);
                 let rel2 = (r2 + 12 - key.tonic) % 12;
-                let c = row.and_then(|x| x.get(&(rel2, q2))).copied().unwrap_or(0.);
+                let c = if (rel2, red(q2)) == (rel, red(q)) {
+                    // même triade, couleur différente (ex. C → Cmaj7) : rare mais permis
+                    0.05 * rt
+                } else {
+                    row.and_then(|x| x.get(&(rel2, red(q2)))).copied().unwrap_or(0.)
+                };
                 let beta = 3.;
                 trans[a][b] = ((c + beta * prior[b].exp()) / (rt + beta)).ln();
             }
@@ -96,7 +144,7 @@ impl<'a> Harmonizer<'a> {
                 }
             }
         }
-        Harmonizer { m, key, prior, trans, emis, hr: 1. }
+        Harmonizer { m, key, prior, trans, emis, hr: 1., avoid: vec![], color: 0., major_bias: 0. }
     }
 
     /// Accords pour les mesures données. `mel` : ligne principale ;
@@ -148,6 +196,24 @@ impl<'a> Harmonizer<'a> {
                     if tot > 0. {
                         sc += 6. * ((inw / tot) - 0.85);
                     }
+                }
+                // réharmonisation : ne pas reprendre l'accord de l'exposé précédent
+                let rel = a - sl[0].0;
+                if let Some(c) = self.avoid.iter().rev().find(|c| c.t <= rel + 0.01 && c.t + c.l > rel + 0.01) {
+                    if (c.r, c.q) == (r, q) {
+                        sc -= 4.;
+                    } else if c.r == r {
+                        sc -= 1.5;
+                    }
+                }
+                if matches!(q, 3 | 4 | 5 | 8) {
+                    sc += self.color;
+                }
+                if matches!(q, 6 | 7) {
+                    sc += self.color.min(0.) * 2. - if self.major_bias > 0. { 2. } else { 0. };
+                }
+                if q == 0 {
+                    sc += self.major_bias;
                 }
                 em[i][s] = sc + 0.35 * self.prior[s];
             }

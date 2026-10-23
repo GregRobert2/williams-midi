@@ -144,6 +144,9 @@ pub struct Model {
     // harmonie (relative à la tonique)
     pub trans: HashMap<(bool, u8, u8), HashMap<(u8, u8), f32>>,
     pub chord_freq: HashMap<(bool, u8, u8), f32>,
+    /// même chose sur les seules mesures forte (passages majestueux / tutti)
+    pub trans_f: HashMap<(bool, u8, u8), HashMap<(u8, u8), f32>>,
+    pub chord_freq_f: HashMap<(bool, u8, u8), f32>,
     pub root_motion: [f32; 12],
     /// mélodie / accord : [temps fort][qualité][intervalle à la fondamentale]
     pub emis: [[[f32; 12]; NQ]; 2],
@@ -359,13 +362,34 @@ pub fn train(corpus: &[Piece]) -> Model {
         }
         let (gt, gmaj, _) = key_of(&gw);
         let segs = harmonize_notes(&harm, &bars);
-        let rel = |r: u8, q: u8| ((r + 12 - gt) % 12, q);
+        // tonalité locale (fenêtre de ±4 mesures) : les accords sont rapportés à
+        // la tonalité du passage, pas de la pièce entière
+        let local: Vec<(u8, bool)> = (0..bars.len())
+            .map(|bi| {
+                let a = bars[bi.saturating_sub(4)].t;
+                let e = bars[(bi + 4).min(bars.len() - 1)].t + bars[(bi + 4).min(bars.len() - 1)].len;
+                let mut w = [0f32; 12];
+                for n in window(&harm, a, e) {
+                    w[(n.k % 12) as usize] += overlap(n, a, e) * n.v as f32;
+                }
+                let (t, maj, r) = key_of(&w);
+                if r > 0.6 { (t, maj) } else { (gt, gmaj) }
+            })
+            .collect();
+        let bar_of = |t: f32| bars.iter().rposition(|b| b.t <= t + 0.01).unwrap_or(0);
+        let _ = (gt, gmaj);
         for w in segs.windows(2) {
             let (a, b) = (w[0], w[1]);
             if (a.1 - b.0).abs() > 0.01 {
                 continue;
             }
-            *m.trans.entry((gmaj, rel(a.2, a.3).0, a.3)).or_default().entry(rel(b.2, b.3)).or_default() += 1.;
+            let bi = bar_of(a.0);
+            let (kt, km) = local[bi];
+            let rel = |r: u8, q: u8| ((r + 12 - kt) % 12, q);
+            *m.trans.entry((km, rel(a.2, a.3).0, a.3)).or_default().entry(rel(b.2, b.3)).or_default() += 1.;
+            if bar_feat[bi].0 == 2 {
+                *m.trans_f.entry((km, rel(a.2, a.3).0, a.3)).or_default().entry(rel(b.2, b.3)).or_default() += 1.;
+            }
             m.root_motion[((b.2 + 12 - a.2) % 12) as usize] += 1.;
             if let (Some(x), Some(y)) = (a.4, b.4) {
                 m.pedal.1 += 1.;
@@ -377,8 +401,12 @@ pub fn train(corpus: &[Piece]) -> Model {
         // tranches : changement d'accord au 1er temps ou en cours de mesure
         let bar_at = |t: f32| bars.iter().rposition(|b| b.t <= t + 0.01).unwrap_or(0);
         for s in &segs {
-            let r = rel(s.2, s.3);
-            *m.chord_freq.entry((gmaj, r.0, r.1)).or_default() += s.1 - s.0;
+            let (kt, km) = local[bar_of(s.0)];
+            let r = ((s.2 + 12 - kt) % 12, s.3);
+            *m.chord_freq.entry((km, r.0, r.1)).or_default() += s.1 - s.0;
+            if bar_feat[bar_of(s.0)].0 == 2 {
+                *m.chord_freq_f.entry((km, r.0, r.1)).or_default() += s.1 - s.0;
+            }
             let bi = bar_at(s.0);
             let b = &bars[bi];
             let nslots = {
@@ -785,6 +813,25 @@ pub fn report(m: &Model) -> String {
         w(&mut o, line.join(" · "));
         let mut tr: Vec<(String, f32)> = vec![];
         for (k, nx) in m.trans.iter().filter(|x| x.0 .0 == maj) {
+            for (n, c) in nx {
+                tr.push((format!("{} → {}", chname(k.1, k.2), chname(n.0, n.1)), *c));
+            }
+        }
+        tr.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let tt: f32 = tr.iter().map(|x| x.1).sum();
+        let s: Vec<String> = tr.iter().take(24).map(|(s, c)| format!("{} {:.1}%", s, 100. * c / tt)).collect();
+        w(&mut o, format!("\nEnchaînements : {}", s.join(" · ")));
+    }
+
+    for maj in [true, false] {
+        w(&mut o, format!("\n## Passages forte / majestueux ({}) — tonique = C\n", if maj { "majeur" } else { "mineur" }));
+        let tot: f32 = m.chord_freq_f.iter().filter(|x| x.0 .0 == maj).map(|x| x.1).sum();
+        let mut v: Vec<_> = m.chord_freq_f.iter().filter(|x| x.0 .0 == maj).collect();
+        v.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+        let line: Vec<String> = v.iter().take(20).map(|(k, c)| format!("{} {:.1}%", chname(k.1, k.2), 100. * *c / tot)).collect();
+        w(&mut o, line.join(" · "));
+        let mut tr: Vec<(String, f32)> = vec![];
+        for (k, nx) in m.trans_f.iter().filter(|x| x.0 .0 == maj) {
             for (n, c) in nx {
                 tr.push((format!("{} → {}", chname(k.1, k.2), chname(n.0, n.1)), *c));
             }

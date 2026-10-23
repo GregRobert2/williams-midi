@@ -215,7 +215,15 @@ impl<'a> Arranger<'a> {
             self.plan.push(format!("entrée « {} » : {:?} ({} notes)", it.name, it.kind, it.notes.len()));
         }
         let all: Vec<N> = inp.items.iter().flat_map(|x| x.notes.clone()).collect();
-        let key = self.o.key.unwrap_or_else(|| key_of_notes(&all));
+        let mut key = self.o.key.unwrap_or_else(|| key_of_notes(&all));
+        // majestueux : un matériau ambigu (mineur naturel) est lu dans son relatif majeur
+        if self.o.key.is_none() && !key.maj && matches!(self.o.mood, Mood::Majestic | Mood::Action) {
+            let has_leading = all.iter().any(|n| n.k % 12 == (key.tonic + 11) % 12);
+            if !has_leading {
+                key = Key { tonic: (key.tonic + 3) % 12, maj: true };
+            }
+        }
+        let forte = matches!(self.o.mood, Mood::Majestic | Mood::Action);
         let bpm = self.o.bpm.unwrap_or(inp.bpm);
         self.plan.push(format!("tonalité {}{} · tempo {:.0} · mesure {}/{}", crate::train::PCN[key.tonic as usize], if key.maj { "" } else { "m" }, bpm, inp.bars[0].num, inp.bars[0].den));
 
@@ -302,14 +310,31 @@ impl<'a> Arranger<'a> {
             let c = if s == 0 { self.o.carrier.map(fam).unwrap_or_else(|| carrier_for(d, 0)) } else { carrier_for(d, 1) };
             let tr = if s == 1 && self.o.modulate { self.modulation() } else { 0 };
             let key_s = Key { tonic: ((key.tonic as i32 + tr).rem_euclid(12)) as u8, maj: key.maj };
-            let mut h = Harmonizer::new(m, key_s);
-            h.hr = self.o.hr * if s == 0 { 0.85 } else { 1.1 };
+            let mut h = Harmonizer::with_stats(m, key_s, forte);
+            h.hr = self.o.hr * if s == 0 { 0.85 } else { 1.25 };
+            // premier exposé : triades franches ; réexposition : couleurs
+            h.color = if forte { -1.0 } else { 0. };
+            h.major_bias = if forte { 0.6 } else { 0. };
+            if s > 0 {
+                // réexposition réharmonisée
+                if let Some(prev) = sections.iter().rev().find(|x| x.kind == Sec::Statement) {
+                    h.avoid = prev.chords.iter().map(|c| Chord { t: c.t - prev.t, ..*c }).collect();
+                }
+                h.color = if forte { -0.4 } else { 0.6 };
+                h.major_bias = if forte { 0.9 } else { 0. };
+            }
             let bed_s = shift(&bed, t, tr);
             let mel = match &theme {
                 Some(th) => shift(th, t, tr),
                 None => vec![],
             };
-            let chords = h.harmonize(&bars, &mel, &bed_s, None, End::Free);
+            // fin de phrase : demi-cadence sur la dominante si elle porte la dernière note
+            let dom_s = (key_s.tonic + 7) % 12;
+            let end = match mel.last() {
+                Some(n) if [dom_s, (dom_s + 4) % 12, (dom_s + 7) % 12].contains(&(n.k % 12)) => End::Is(dom_s, 0),
+                _ => End::Free,
+            };
+            let chords = h.harmonize(&bars, &mel, &bed_s, None, end);
             let mel = if mel.is_empty() || (self.o.add_theme && s == 1 && theme_src.is_some()) {
                 // thème généré (sur ostinato, ou nouveau thème par-dessus)
                 let (lo, hi) = self.reg(c, R_MEL);
@@ -344,8 +369,10 @@ impl<'a> Arranger<'a> {
             let s = &sections[i];
             match s.kind {
                 Sec::Intro => {
-                    let mut h = Harmonizer::new(m, key);
+                    let mut h = Harmonizer::with_stats(m, key, forte);
                     h.hr = self.o.hr * 0.6;
+                    h.color = if forte { -1.0 } else { 0. };
+                    h.major_bias = if forte { 0.6 } else { 0. };
                     let half = s.bars.len() / 2;
                     // pédale de tonique sur la première moitié
                     let ped: Vec<N> = s.bars[..half.max(1)].iter().map(|b| N { t: b.t, l: b.len, k: 40 + key.tonic, v: 80 }).collect();
@@ -369,8 +396,10 @@ impl<'a> Arranger<'a> {
                     let nbar = s.bars.len();
                     // cadence apprise vers la tonique (majeure pour un final majestueux)
                     let end = if mood == Mood::Majestic || mood == Mood::Action { End::Is(key.tonic, 0) } else { End::Tonic };
-                    let mut h = Harmonizer::new(m, key);
+                    let mut h = Harmonizer::with_stats(m, key, forte);
                     h.hr = self.o.hr * 1.2;
+                    h.color = if forte { -1.0 } else { 0. };
+                    h.major_bias = if forte { 0.6 } else { 0. };
                     let cad_bars: Vec<Bar> = s.bars[..nbar.saturating_sub(1).max(1)].iter().map(|b| Bar { ..*b }).collect();
                     let motif: Vec<N> = theme.as_ref().map(|th| augment(&head(th, 1, &inp.bars), 2.)).unwrap_or_default();
                     let mot = shift(&motif, s.t, 0);

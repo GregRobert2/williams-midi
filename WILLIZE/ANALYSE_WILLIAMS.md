@@ -15,15 +15,27 @@
 
 ## Accords (majeur) — degrés relatifs, tonique = C
 
-C 12.4% · F 4.6% · Cmaj7 4.4% · Am7 4.2% · Dm7 3.9% · G 3.8% · Fmaj7 3.5% · C7 2.8% · G7 2.3% · Em7 2.1% · Bb 2.1% · Am 2.0% · Csus4 1.9% · Abmaj7 1.8% · Csus2 1.7% · Gm7 1.7% · Gsus4 1.6% · D 1.6% · Cm 1.5% · D7 1.4%
+C 22.3% · Am7 6.4% · Cmaj7 5.8% · Dm7 5.4% · F 4.4% · Fmaj7 4.2% · C7 4.0% · Csus4 3.9% · Csus2 3.0% · G7 2.9% · G 2.5% · Fsus2 2.1% · Gsus4 2.0% · Abmaj7 1.8% · Em7 1.5% · Gm7 1.5% · Cm 1.5% · D7 1.3% · C#maj7 1.2% · Am 1.2%
 
-Enchaînements : C → F 0.9% · C → Cmaj7 0.7% · F → C 0.7% · G7 → C 0.7% · G → C 0.6% · C → Dm7 0.6% · Dm7 → C 0.6% · C → Am7 0.6% · Cmaj7 → C 0.5% · Dm7 → G7 0.5% · C → Csus4 0.5% · Am7 → C 0.5% · C → G 0.5% · Am7 → Dm7 0.5% · Fmaj7 → Dm7 0.4% · C → Fmaj7 0.4% · Fmaj7 → C 0.4% · Csus2 → C 0.4% · Csus4 → C 0.4% · Cmaj7 → Am7 0.4% · Dm7 → Cmaj7 0.4% · C → Csus2 0.3% · Am7 → Fmaj7 0.3% · Cmaj7 → F 0.3%
+Enchaînements : C → F 1.4% · F → C 1.2% · Dm7 → C 1.1% · C → Cmaj7 1.1% · C → Dm7 1.1% · G7 → C 1.1% · C → Csus4 1.0% · C → Am7 1.0% · Cmaj7 → C 1.0% · Am7 → C 0.9% · G → C 0.9% · C → Fmaj7 0.8% · Csus2 → C 0.8% · Csus4 → C 0.8% · Fmaj7 → C 0.8% · Am7 → Dm7 0.7% · Fmaj7 → Dm7 0.7% · Dm7 → Cmaj7 0.7% · C → Csus2 0.6% · Dm7 → G7 0.6% · Cmaj7 → Am7 0.6% · C → G7 0.6% · C → C7 0.5% · Cmaj7 → Dm7 0.5%
 
 ## Accords (mineur) — degrés relatifs, tonique = C
 
-Cm 10.2% · Abmaj7 5.0% · C 4.0% · Ab 3.7% · G 2.7% · Fm 2.4% · Fm7 2.4% · Cm7 2.4% · Ebmaj7 2.2% · Dm7 2.2% · C#maj7 2.2% · Cmaj7 2.1% · Eb 1.9% · G7 1.7% · F 1.7% · F7 1.6% · Bb 1.6% · Ebm 1.5% · C7 1.5% · Csus2 1.4%
+Cm 17.1% · Abmaj7 8.8% · Ab 5.3% · C 4.3% · Cm7 3.7% · Fm7 3.5% · Fm 2.6% · G 2.3% · F7 2.3% · Ebmaj7 2.3% · Cmaj7 2.1% · C#maj7 2.1% · Csus2 1.9% · Dm7 1.9% · G7 1.9% · Eb 1.7% · Abm 1.5% · D7 1.4% · Cdim 1.4% · Csus4 1.2%
 
-Enchaînements : Cm → Abmaj7 0.8% · G7 → Cm 0.7% · Abmaj7 → Cm 0.6% · Cm → Ab 0.5% · G → Cm 0.5% · Cm → G7 0.4% · Dm7 → Cm 0.4% · Cm → Dm7 0.4% · Csus2 → Cm 0.4% · Ab → Cm 0.3% · Abmaj7 → Fm7 0.3% · Cm → Fm 0.3% · Cm → Cm7 0.3% · Cm → Ebm 0.3% · Cm → Csus2 0.3% · Gsus4 → Cm 0.3% · Fm → Cm 0.3% · Abm → Cm 0.3% · Gmaj7 → Cm 0.3% · Abmaj7 → Abm 0.3% · Cm → C 0.3% · Ab → Abmaj7 0.2% · D7 → Cm 0.2% · Cm → Abm 0.2%
+Enchaînements : Cm → Abmaj7 1.2% · Abmaj7 → Cm 1.0% · G7 → Cm 0.9% · Cm → Ab 0.9% · G → Cm 0.8% · Cm → Fm 0.8% · Fm → Cm 0.7% · Cm → Dm7 0.7% · Csus2 → Cm 0.6% · Dm7 → Cm 0.6% · Cm → Csus2 0.6% · Cm → Fm7 0.6% · Ab → Cm 0.5% · Cm → Cm7 0.5% · Abmaj7 → Ab 0.5% · Cm → Abm 0.5% · Fm7 → Cm 0.4% · Ab → Abmaj7 0.4% · Abmaj7 → Fm7 0.4% · Abm → Cm 0.4% · Cm7 → Abmaj7 0.4% · Cm → G7 0.4% · Cm → F7 0.4% · Cm → Ebm 0.4%
+
+## Passages forte / majestueux (majeur) — tonique = C
+
+C 21.3% · Am7 7.3% · C7 6.3% · Dm7 5.3% · Cmaj7 5.1% · Fmaj7 4.7% · F 3.8% · Csus4 3.8% · G7 2.7% · G 2.5% · Csus2 2.4% · Fsus2 2.2% · Gsus4 2.0% · Cm 2.0% · Em7 1.8% · Gm7 1.6% · Abmaj7 1.6% · D7 1.4% · C#maj7 1.3% · Fm 1.3%
+
+Enchaînements : F → C 1.4% · C → F 1.3% · Dm7 → C 1.2% · C → Dm7 1.1% · G7 → C 1.1% · Am7 → Dm7 1.0% · C → Fmaj7 1.0% · Am7 → C 0.9% · C → Am7 0.9% · C → C7 0.8% · Csus4 → C 0.8% · C → Cmaj7 0.8% · Dm7 → Am7 0.8% · G → C 0.7% · C → Csus4 0.7% · Fmaj7 → C 0.7% · Gm7 → C 0.7% · Cmaj7 → C 0.7% · C7 → C 0.6% · Cmaj7 → Fmaj7 0.6% · Fmaj7 → Dm7 0.6% · Dm7 → Cmaj7 0.6% · Cmaj7 → Am7 0.5% · Am7 → Fmaj7 0.5%
+
+## Passages forte / majestueux (mineur) — tonique = C
+
+Cm 13.9% · Abmaj7 8.0% · Ab 5.6% · C 5.4% · Cm7 4.7% · Fm7 3.9% · C#maj7 2.8% · G7 2.7% · G 2.5% · Cmaj7 2.4% · F7 2.3% · Fm 2.2% · Dm7 2.2% · Eb 1.9% · Ebmaj7 1.8% · Abm 1.6% · Cdim 1.6% · C7 1.6% · D7 1.4% · Csus2 1.4%
+
+Enchaînements : Cm → Abmaj7 1.2% · G7 → Cm 1.2% · Abmaj7 → Cm 1.0% · Cm → Ab 0.6% · Cm → Dm7 0.6% · F7 → Cm7 0.6% · Cm7 → F7 0.6% · C → Cm 0.5% · Cm7 → Ab 0.5% · G → Cm 0.5% · Abmaj7 → Fm7 0.5% · Dm7 → G7 0.5% · Fm → Cm 0.5% · Dm7 → Cm 0.4% · Abmaj7 → Ab 0.4% · G → Ab 0.4% · Cm → F 0.4% · Cm → G7 0.4% · Cm → Cm7 0.4% · Abmaj7 → Abm 0.4% · Fm7 → Abmaj7 0.4% · Cm → F7 0.4% · Cm → C#maj7 0.4% · Cm → Fm7 0.4%
 
 ## Mélodie et contre-chant
 
@@ -38,8 +50,8 @@ Enchaînements : Cm → Abmaj7 0.8% · G7 → Cm 0.7% · Abmaj7 → Cm 0.6% · C
 
 ## Mesures et ambiance
 
-- f/lent/léger (676 mes.) : 4/4 82%, 3/4 8%, 2/4 7%, 5/4 1%, 6/4 1%
-- f/modéré/dense (661 mes.) : 4/4 58%, 2/4 22%, 3/4 15%, 2/2 1%, 3/2 1%
+- f/lent/léger (676 mes.) : 4/4 82%, 3/4 8%, 2/4 7%, 6/4 1%, 5/4 1%
+- f/modéré/dense (661 mes.) : 4/4 58%, 2/4 22%, 3/4 15%, 2/2 1%, 6/8 1%
 - f/modéré/léger (2290 mes.) : 4/4 66%, 3/4 17%, 2/4 5%, 6/8 2%, 12/8 2%
 - f/rapide/dense (594 mes.) : 4/4 33%, 12/8 19%, 2/2 16%, 2/4 15%, 3/2 7%
 - f/rapide/léger (2086 mes.) : 4/4 58%, 3/4 15%, 2/2 10%, 2/4 8%, 6/8 3%
@@ -48,8 +60,8 @@ Enchaînements : Cm → Abmaj7 0.8% · G7 → Cm 0.7% · Abmaj7 → Cm 0.6% · C
 - mf/modéré/dense (1662 mes.) : 4/4 51%, 3/4 20%, 2/4 19%, 6/8 5%, 3/2 3%
 - mf/modéré/léger (2871 mes.) : 4/4 56%, 3/4 14%, 2/4 10%, 6/8 6%, 12/8 4%
 - mf/rapide/dense (1585 mes.) : 4/4 48%, 2/2 14%, 3/2 8%, 2/4 8%, 3/4 7%
-- mf/rapide/léger (3027 mes.) : 4/4 56%, 3/4 19%, 2/2 11%, 2/4 3%, 12/8 3%
-- p/lent/dense (301 mes.) : 4/4 65%, 2/4 17%, 3/4 13%, 3/8 4%, 9/8 0%
+- mf/rapide/léger (3027 mes.) : 4/4 56%, 3/4 19%, 2/2 11%, 12/8 3%, 2/4 3%
+- p/lent/dense (301 mes.) : 4/4 65%, 2/4 17%, 3/4 13%, 3/8 4%, 6/4 0%
 - p/lent/léger (1857 mes.) : 4/4 65%, 3/4 19%, 3/8 9%, 2/4 5%, 6/8 0%
 - p/modéré/dense (937 mes.) : 4/4 38%, 2/4 23%, 3/4 17%, 3/8 15%, 6/8 4%
 - p/modéré/léger (3062 mes.) : 4/4 57%, 3/4 18%, 6/8 7%, 3/8 6%, 2/4 5%
@@ -668,7 +680,7 @@ Espacement des voix (médiane, basse → aigu) : 12 · 5 · 4 · 4 · 5 · 4 dem
 - Cello ostinato : `x...x...x...x...` 14% `x.x.x.x.x.x.x.x.` 9% `x...x.x.x.x.x.x.` 8% `x.......x.......` 5%
 - Harp ostinato : `x...x...x...x...` 9% `x.x.x.x.x.x.x.x.` 8% `xxxxxxxxxxxxxxxx` 5% `........xxxxxxxx` 5%
 - Horn ostinato : `x...x...x...x...` 6% `x.x.x.x.x.x.x.x.` 5% `....x.......x...` 3% `x...x...x.......` 2%
-- Horn counter : `x...x.......x...` 13% `x...x...x...x...` 9% `....x.x.x...x...` 6% `x.......x...x...` 6%
+- Horn counter : `x...x.......x...` 13% `x...x...x...x...` 9% `....x.x.x...x...` 6% `x.x.x.........xx` 6%
 - Trumpet counter : `x...........x..x` 10% `x.x.........x..x` 9% `x...x.......x...` 7% `x...x...x...x...` 6%
 - Trombone counter : `x...x.......x...` 9% `....x...x...x...` 8% `x...x...x...x...` 7% `x...........x..x` 5%
 - Bass bass : `x...............` 15% `x.......x.......` 11% `x...x...x...x...` 10% `x.x.x.x.x.x.x.x.` 5%
