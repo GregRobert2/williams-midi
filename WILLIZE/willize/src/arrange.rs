@@ -734,6 +734,14 @@ impl<'a> Arranger<'a> {
         // ----- contre-chants
         for i in with(&role_of, R_CTR) {
             let f = fam(PALETTE[i].inst);
+            // cuivres : figures de fanfare apprises (harmonisées) ; autres : ligne
+            if matches!(PALETTE[i].inst, Inst::Horn | Inst::Trumpet | Inst::Trombone) {
+                let nv = if d == 2 { PALETTE[i].max.min(3) } else { 2 };
+                if self.figure(i, R_CTR, d, s, key, nv, vel) {
+                    lines.push(format!("figures de fanfare : {}", PALETTE[i].name));
+                    continue;
+                }
+            }
             let (lo, hi) = self.reg(f, R_CTR);
             let mel_med = s.mel.iter().map(|n| n.k as f32).sum::<f32>() / s.mel.len().max(1) as f32;
             let below = ((lo as f32 + hi as f32) / 2.) < mel_med + 3.;
@@ -774,33 +782,16 @@ impl<'a> Arranger<'a> {
         }
         if s.kind != Sec::Extension {
             for &i in &ost_desks {
-                let f = fam(PALETTE[i].inst);
-                let (lo, hi) = self.reg(f, R_OST);
-                let rh = m.top_rhythms(f, R_OST, d, 8);
-                let mask = rh.iter().map(|r| r.0).find(|mk| mk & 1 == 1 && mk.count_ones() >= 4 && mk.count_ones() <= 8).unwrap_or(0x5555);
-                let mut prev = [((lo as u16 + hi as u16) / 2) as u8, ((lo as u16 + hi as u16) / 2 - 4) as u8];
-                for b in &s.bars {
-                    let steps: Vec<f32> = if (b.num, b.den) == (4, 4) {
-                        (0..16).filter(|x| mask & (1 << x) != 0).map(|x| x as f32 * 0.25).collect()
-                    } else {
-                        (0..(b.len * 2.) as usize).map(|x| x as f32 * 0.5).collect()
-                    };
-                    let mut cur: Option<Chord> = None;
-                    let mut pool = vec![];
-                    for (si, st) in steps.iter().enumerate() {
-                        let t = b.t + st;
-                        let cc = *chord_at(ch, t);
-                        if cur != Some(cc) {
-                            pool = lead(&cc.tones(), &mut prev, lo, hi, &[]);
-                            cur = Some(cc);
-                        }
-                        let k = pool[si % pool.len()];
-                        let nx = steps.get(si + 1).map(|x| b.t + x).unwrap_or(b.t + b.len);
-                        let acc = if st.fract() == 0. && (*st as i32) % 2 == 0 { 8 } else { 0 };
-                        self.put(PALETTE[i].name, t, (nx - t) * 0.9, k, vel.saturating_sub(12) + acc);
-                    }
+                let nv = match PALETTE[i].inst {
+                    Inst::Horn | Inst::Trumpet | Inst::Trombone => if d == 2 { 3 } else { 2 },
+                    Inst::Clarinet | Inst::Flute | Inst::Oboe | Inst::Bassoon => 2,
+                    _ => 1,
+                };
+                if self.figure(i, R_OST, d, s, key, nv, vel.saturating_sub(8)) {
+                    lines.push(format!("figure apprise : {}", PALETTE[i].name));
+                } else {
+                    role_of[i] = Some(R_SUS);
                 }
-                lines.push(format!("ostinato : {}", PALETTE[i].name));
             }
         }
 
@@ -826,23 +817,16 @@ impl<'a> Arranger<'a> {
         lines.push(format!("tenues : {}", sus_names.join(", ")));
 
 
-        // ----- harpe : arpèges (figure apprise) ou glissando vers une section plus forte
-        if role_of[desk("Harp")].is_some() || s.kind == Sec::Intro {
-            let rh = m.top_rhythms(fam(Inst::Harp), R_OST, d, 6);
-            let mask = rh.iter().map(|r| r.0).find(|mk| mk & 1 == 1).unwrap_or(0x5555);
-            for b in &s.bars {
-                let c = *chord_at(ch, b.t);
-                let tones: Vec<u8> = (36..90).filter(|k| c.has(*k)).filter(|k| *k >= 36 + c.bass.min(11)).collect();
-                let steps: Vec<f32> = if (b.num, b.den) == (4, 4) { (0..16).filter(|x| mask & (1 << x) != 0).map(|x| x as f32 * 0.25).collect() } else { (0..(b.len * 2.) as usize).map(|x| x as f32 * 0.5).collect() };
-                let base = tones.iter().position(|&k| k % 12 == c.bass).unwrap_or(0);
-                for (j, st) in steps.iter().enumerate() {
-                    let cc = chord_at(ch, b.t + st);
-                    let k = tones.get(base + j).copied().unwrap_or(tones[tones.len() - 1]);
-                    let k = if cc.has(k) { k } else { (k.saturating_sub(2)..=k + 2).find(|x| cc.has(*x)).unwrap_or(k) };
-                    self.put("Harp", b.t + st, 1.5, k, vel.saturating_sub(15));
+        // ----- harpe : accords arpégés (roulés) aux changements d'accord en nuance douce
+        if (role_of[desk("Harp")].is_some() || s.kind == Sec::Intro) && d <= 1 {
+            for c in ch {
+                let tones: Vec<u8> = (40..84).filter(|k| c.has(*k)).collect();
+                let low = tones.iter().position(|&k| k % 12 == c.bass).unwrap_or(0);
+                for (j, k) in tones[low..].iter().take(6).enumerate() {
+                    self.put("Harp", c.t + j as f32 * 0.07, c.l.min(4.), *k, vel.saturating_sub(18) + j as u8 * 2);
                 }
             }
-            lines.push("harpe : arpèges".into());
+            lines.push("harpe : accords roulés".into());
         }
         if next_d > s.d1 {
             let lb = s.bars.last().unwrap();
@@ -854,21 +838,16 @@ impl<'a> Arranger<'a> {
             }
         }
 
-        // ----- claviers : célesta en ouverture piano (scintillement), glock à l'apogée
-        if s.kind == Sec::Intro && d == 0 && p("Celesta")[R_OST] + p("Celesta")[R_MEL] + p("Celesta")[R_SUS] > 0.0 {
-            for b in s.bars.iter().take((s.bars.len() / 2).max(1)) {
-                let c = *chord_at(ch, b.t);
-                let tones: Vec<u8> = (76..96).filter(|k| c.has(*k)).collect();
-                let pat = [0usize, 2, 1, 2];
-                let mut j = 0;
-                let mut t = b.t;
-                while t < b.t + b.len - 0.01 {
-                    self.put("Celesta", t, 0.5, tones[pat[j % 4].min(tones.len() - 1)], 45);
-                    j += 1;
-                    t += 0.5;
-                }
+        // ----- célesta : figure apprise en ouverture douce
+        if s.kind == Sec::Intro && d == 0 && self.figure(desk("Celesta"), R_OST, 0, s, key, 1, 45) {
+            lines.push("célesta : figure apprise".into());
+        }
+        // ----- traits appris aux fins de phrase
+        if d >= 1 || s.kind == Sec::Intro {
+            let n = self.runs(s, key, d, &role_of);
+            if n > 0 {
+                lines.push(format!("traits : {}", n));
             }
-            lines.push("célesta : scintillement".into());
         }
 
         // ----- timbales et percussions (probabilités apprises)
@@ -949,6 +928,138 @@ impl<'a> Arranger<'a> {
         }
 
         self.plan.push(format!("  {} : {}", s.name, lines.join(" · ")));
+    }
+
+    /// Réalise une figure réelle apprise (rythme + forme) sur l'harmonie :
+    /// transposée sur un son de l'accord, notes des temps forts ramenées à
+    /// l'accord, autres notes à la gamme ; voix ajoutées sous la figure.
+    fn figure(&mut self, i: usize, role: usize, d: usize, s: &Section, key: Key, voices: usize, vel: u8) -> bool {
+        let m = self.m;
+        let f = fam(PALETTE[i].inst);
+        let mut acc: std::collections::HashMap<Vec<(u8, i8)>, (f32, [f32; 12])> = Default::default();
+        for dd in 0..3 {
+            if let Some(h) = m.figs.get(&(f, role, dd)) {
+                let w = if dd == d { 3. } else { 1. };
+                for ((fg, iv), c) in h {
+                    let e = acc.entry(fg.clone()).or_insert((0., [0.; 12]));
+                    e.0 += c * w;
+                    e.1[*iv as usize] += c;
+                }
+            }
+        }
+        let min_notes = if role == R_OST { 4 } else { 3 };
+        let mut tops: Vec<(Vec<(u8, i8)>, f32, [f32; 12])> = acc
+            .into_iter()
+            .filter(|(fg, _)| fg.len() >= min_notes && fg.iter().all(|x| x.1.abs() <= 12))
+            .map(|(fg, (c, h))| (fg, c, h))
+            .collect();
+        tops.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap().then(a.0.cmp(&b.0)));
+        tops.truncate(2);
+        if tops.is_empty() {
+            return false;
+        }
+        let (lo, hi) = self.reg(f, role);
+        let scale: Vec<u8> = if key.maj { vec![0, 2, 4, 5, 7, 9, 11] } else { vec![0, 2, 3, 5, 7, 8, 10] }.into_iter().map(|x| (x + key.tonic) % 12).collect();
+        let mut prev = ((lo as i32 + hi as i32) / 2) as i32;
+        let name = PALETTE[i].name;
+        for (bi, b) in s.bars.iter().enumerate() {
+            let c = *chord_at(&s.chords, b.t);
+            if (b.num, b.den) != (4, 4) {
+                let k = (lo as i32..=hi as i32).filter(|k| c.has(*k as u8)).min_by_key(|k| (k - prev).abs()).unwrap_or(prev);
+                self.put(name, b.t, b.len, k as u8, vel);
+                continue;
+            }
+            let (fg, _, h) = &tops[(bi / 4) % tops.len()];
+            let ct: Vec<u8> = c.tones().iter().map(|t| (t + 12 - c.r) % 12).collect();
+            let iv = (0..12u8).filter(|x| ct.contains(x)).max_by(|a, b| h[*a as usize].partial_cmp(&h[*b as usize]).unwrap()).unwrap_or(0);
+            let pc = (c.r + iv) % 12;
+            let mino = fg.iter().map(|x| x.1 as i32).min().unwrap();
+            let maxo = fg.iter().map(|x| x.1 as i32).max().unwrap();
+            let anchor = ((lo as i32 - mino)..=(hi as i32 - maxo).max(lo as i32 - mino))
+                .filter(|k| (k % 12) as u8 == pc)
+                .min_by_key(|k| (k - prev).abs())
+                .unwrap_or(prev);
+            prev = anchor;
+            for (j, &(sl, off)) in fg.iter().enumerate() {
+                let t = b.t + sl as f32 * 0.25;
+                let nx = fg.get(j + 1).map(|x| b.t + x.0 as f32 * 0.25).unwrap_or(b.t + b.len);
+                let cc = *chord_at(&s.chords, t);
+                let mut k = (anchor + off as i32).clamp(0, 127) as u8;
+                let strong = sl % 4 == 0;
+                if (strong && !cc.has(k)) || (!scale.contains(&(k % 12)) && !cc.has(k)) {
+                    k = (0..=3u8).flat_map(|dx| [k.saturating_sub(dx), k + dx]).find(|x| cc.has(*x)).unwrap_or(k);
+                }
+                let dur = if role == R_OST { (nx - t) * 0.85 } else { nx - t };
+                let acc_v = if strong { 6 } else { 0 };
+                self.put(name, t, dur, k, vel + acc_v);
+                // voix ajoutées : sons de l'accord sous la figure
+                let mut below = k;
+                for _ in 1..voices {
+                    if let Some(x) = (below.saturating_sub(9)..below.saturating_sub(2)).rev().find(|x| cc.has(*x) && *x >= lo.saturating_sub(5)) {
+                        self.put(name, t, dur, x, vel.saturating_sub(4) + acc_v);
+                        below = x;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// Traits appris : gamme rapide (longueur et sens appris) qui conduit au
+    /// temps fort de la phrase suivante, confiée aux pupitres qui en font le plus.
+    fn runs(&mut self, s: &Section, key: Key, d: usize, role_of: &[Option<usize>]) -> usize {
+        let m = self.m;
+        let mut cands: Vec<(usize, f32)> = ["Flutes", "Piccolo", "Clarinets", "Oboes", "Violins 1"]
+            .iter()
+            .map(|n| desk(n))
+            .filter(|&i| role_of[i] != Some(R_MEL) && !self.parts[i].iter().any(|n| n.t >= s.t && n.t < end_of(&s.bars) && n.v > VEL[d] + 5))
+            .map(|i| (i, m.runs.get(&(fam(PALETTE[i].inst), d)).map(|x| x.0 / x.1.max(1.)).unwrap_or(0.)))
+            .collect();
+        cands.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let ndesk = if d == 2 { 2 } else { 1 };
+        let len = crate::train::pct(&m.run_len, 0.5).clamp(5, 10) as usize;
+        let up = m.run_up.0 / m.run_up.1.max(1.) >= 0.5;
+        let scale: Vec<u8> = if key.maj { vec![0, 2, 4, 5, 7, 9, 11] } else { vec![0, 2, 3, 5, 7, 8, 10] }.into_iter().map(|x| (x + key.tonic) % 12).collect();
+        let mut n = 0;
+        for (bi, b) in s.bars.iter().enumerate() {
+            let phrase_end = (bi + 1) % 4 == 0 || bi + 1 == s.bars.len();
+            if !phrase_end || b.len < 2. {
+                continue;
+            }
+            let c = *chord_at(&s.chords, b.t + b.len - 0.5);
+            for &(i, _) in cands.iter().take(ndesk) {
+                let f = fam(PALETTE[i].inst);
+                let (lo, hi) = m.reg_range(f, R_OST, 0.1, 0.95);
+                // sommet (montant) ou départ (descendant) : son de l'accord dans l'aigu du pupitre
+                let top = (lo..=hi).rev().find(|k| c.has(*k)).unwrap_or(hi);
+                let mut ks = vec![top];
+                let mut k = top;
+                while ks.len() < len {
+                    k -= 1;
+                    while !scale.contains(&(k % 12)) {
+                        k -= 1;
+                    }
+                    ks.push(k);
+                }
+                if up {
+                    ks.reverse();
+                }
+                let step = 0.25;
+                let t0 = b.t + b.len - step * len as f32;
+                // le trait remplace ce que le pupitre jouait à cet endroit
+                self.parts[i].retain(|x| x.t < t0 - 0.01 || x.t >= b.t + b.len);
+                for x in self.parts[i].iter_mut() {
+                    if x.t < t0 && x.t + x.l > t0 {
+                        x.l = t0 - x.t;
+                    }
+                }
+                for (j, k) in ks.iter().enumerate() {
+                    self.put(PALETTE[i].name, t0 + j as f32 * step, step * 0.95, *k, VEL[d] - 6 + j as u8 * 2);
+                }
+                n += 1;
+            }
+        }
+        n
     }
 
     /// Respecte le nombre de voix maximal de chaque pupitre.

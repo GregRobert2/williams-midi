@@ -188,7 +188,17 @@ pub struct Model {
     pub modulation: HashMap<i8, f32>,
     pub modulation_ctx: Vec<(String, i8, usize, usize)>,
     pub openings: Vec<(usize, usize, bool, Vec<usize>)>,
+    /// figures réelles (rythme + forme mélodique) : (famille, rôle, nuance) -> figure -> n
+    pub figs: HashMap<(usize, usize, usize), HashMap<Fig, f32>>,
+    /// traits (gammes rapides vers un temps fort) : (famille, nuance) -> (traits, mesures jouées)
+    pub runs: HashMap<(usize, usize), (f32, f32)>,
+    pub run_len: Vec<u8>,
+    pub run_up: (f32, f32),
 }
+
+/// Figure d'une mesure 4/4 : (double-croche, écart en demi-tons à la 1re note),
+/// intervalle de la 1re note à la fondamentale de l'accord.
+pub type Fig = (Vec<(u8, i8)>, u8);
 
 pub struct MeterChange {
     pub from: String,
@@ -653,6 +663,64 @@ pub fn train(corpus: &[Piece]) -> Model {
                     last_line[f] = None;
                 }
             }
+            // figures réelles des pupitres d'accompagnement / contre-chant
+            if (b.num, b.den) == (4, 4) {
+                let seg = segs.iter().find(|x| x.0 <= a + 0.01 && x.1 > a + 0.01);
+                for f in 0..NF {
+                    if !pitched(f) || !matches!(role_of[f], R_OST | R_CTR) {
+                        continue;
+                    }
+                    let tl = topline(&notes[f]);
+                    if tl.len() < 2 || tl.len() > 16 {
+                        continue;
+                    }
+                    let mut fig = vec![];
+                    let mut ok = true;
+                    for n in &tl {
+                        let x = (n.t - a) * 4.;
+                        let sl = x.round();
+                        if (x - sl).abs() > 0.15 || !(0. ..16.).contains(&sl) {
+                            ok = false;
+                            break;
+                        }
+                        let dk = n.k as i32 - tl[0].k as i32;
+                        if dk.abs() > 24 {
+                            ok = false;
+                            break;
+                        }
+                        fig.push((sl as u8, dk as i8));
+                    }
+                    if ok && fig[0].0 == 0 {
+                        let iv = seg.map(|x| (tl[0].k % 12 + 12 - x.2) % 12).unwrap_or(0);
+                        *m.figs.entry((f, role_of[f], d)).or_default().entry((fig, iv)).or_default() += 1.;
+                    }
+                }
+            }
+            // traits : >= 5 notes rapides conjointes qui atterrissent sur le temps fort suivant
+            for f in 0..NF {
+                if !pitched(f) || notes[f].is_empty() {
+                    continue;
+                }
+                let e2 = m.runs.entry((f, d)).or_insert((0., 0.));
+                e2.1 += 1.;
+                let tail: Vec<N> = topline(&window(&fams[f], e - 1.6, e + 0.06).filter(|n| n.t >= e - 1.6).copied().collect::<Vec<_>>());
+                let land = tail.iter().position(|n| (n.t - e).abs() < 0.06);
+                if let Some(li) = land {
+                    let mut j = li;
+                    while j > 0 && tail[j].t - tail[j - 1].t <= 0.26 && (tail[j].k as i32 - tail[j - 1].k as i32).abs() <= 3 && tail[j].k != tail[j - 1].k {
+                        j -= 1;
+                    }
+                    let len = li - j;
+                    if len >= 5 {
+                        e2.0 += 1.;
+                        m.run_len.push(len as u8);
+                        m.run_up.1 += 1.;
+                        if tail[li].k > tail[j].k {
+                            m.run_up.0 += 1.;
+                        }
+                    }
+                }
+            }
             // contre-chant vs mélodie
             if mel_line.len() >= 2 {
                 for f in (0..NF).filter(|&f| role_of[f] == R_CTR) {
@@ -986,6 +1054,34 @@ pub fn report(m: &Model) -> String {
         }).collect();
         w(&mut o, format!("- {:?} {} : {}", inst, ROLES[role], s.join(" ")));
     }
+
+    w(&mut o, "\n## Figures réelles (rythme + forme, 4/4)\n".into());
+    for (inst, role) in [(Inst::Violin, R_OST), (Inst::Viola, R_OST), (Inst::Cello, R_OST), (Inst::Horn, R_OST), (Inst::Trumpet, R_OST), (Inst::Trumpet, R_CTR), (Inst::Horn, R_CTR), (Inst::Clarinet, R_OST), (Inst::Flute, R_OST), (Inst::Harp, R_OST)] {
+        let f = fam(inst);
+        let mut acc: HashMap<&Fig, f32> = HashMap::new();
+        for d in 0..3 {
+            if let Some(h) = m.figs.get(&(f, role, d)) {
+                for (k, v) in h {
+                    *acc.entry(k).or_default() += v;
+                }
+            }
+        }
+        let mut v: Vec<_> = acc.into_iter().filter(|x| x.0 .0.len() >= 3).collect();
+        v.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let s: Vec<String> = v.iter().take(3).map(|(fg, c)| {
+            let g: Vec<String> = fg.0.iter().map(|(sl, dk)| format!("{}:{:+}", sl, dk)).collect();
+            format!("[{}] ×{}", g.join(" "), c)
+        }).collect();
+        w(&mut o, format!("- {:?} {} : {}", inst, ROLES[role], s.join(" · ")));
+    }
+    w(&mut o, "\n## Traits (gammes rapides vers le temps fort)\n".into());
+    for d in 0..3 {
+        let mut v: Vec<(usize, f32)> = (0..NF).filter_map(|f| m.runs.get(&(f, d)).filter(|x| x.1 > 50.).map(|x| (f, x.0 / x.1))).collect();
+        v.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let s: Vec<String> = v.iter().take(6).map(|(f, p)| format!("{} {:.1}%", fname(*f), 100. * p)).collect();
+        w(&mut o, format!("- {} : {}", DYN[d], s.join(", ")));
+    }
+    w(&mut o, format!("- longueur médiane {} notes, montants {:.0}%", pct(&m.run_len, 0.5), 100. * m.run_up.0 / m.run_up.1.max(1.)));
 
     w(&mut o, "\n## Percussions et densité\n".into());
     for d in 0..3 {
