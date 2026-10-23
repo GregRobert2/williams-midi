@@ -21,6 +21,7 @@ pub struct Track {
     pub name: String,
     pub evs: Vec<Ev>,
     pub tempos: Vec<(u32, u32)>,
+    pub timesigs: Vec<(u32, u8, u8)>,
 }
 
 pub struct Song {
@@ -45,7 +46,7 @@ pub fn read(d: &[u8]) -> Song {
     let mut p = 14;
     let mut tracks = vec![];
     while p + 8 <= d.len() {
-        let len = u32::from_be_bytes([d[p + 4], d[p + 5], d[p + 6], d[p + 7]]) as usize;
+        let len = (u32::from_be_bytes([d[p + 4], d[p + 5], d[p + 6], d[p + 7]]) as usize).min(d.len() - p - 8);
         let body = &d[p + 8..p + 8 + len];
         p += 8 + len;
         let mut tr = Track::default();
@@ -67,6 +68,9 @@ pub fn read(d: &[u8]) -> Song {
                     let m = &body[q..q + l];
                     if ty == 3 {
                         tr.name = String::from_utf8_lossy(m).into_owned();
+                    }
+                    if ty == 0x58 && l >= 2 {
+                        tr.timesigs.push((t, m[0], 1u8 << m[1].min(6)));
                     }
                     if ty == 0x51 {
                         tr.tempos.push((t, (m[0] as u32) << 16 | (m[1] as u32) << 8 | m[2] as u32));
@@ -128,6 +132,9 @@ pub fn write(s: &Song) -> Vec<u8> {
         wvlq(&mut nm, tr.name.len() as u32);
         nm.extend(tr.name.as_bytes());
         raw.push((0, 0, nm));
+        for &(t, n, d) in &tr.timesigs {
+            raw.push((t, 0, vec![0xff, 0x58, 4, n, d.trailing_zeros() as u8, 24, 8]));
+        }
         for &(t, us) in &tr.tempos {
             raw.push((t, 0, vec![0xff, 0x51, 3, (us >> 16) as u8, (us >> 8) as u8, us as u8]));
         }
